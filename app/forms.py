@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, FileField
 from wtforms.validators import DataRequired
 
 
@@ -14,3 +14,8 @@ class DomainForm(FlaskForm):
     domain = StringField('Domain', validators=[DataRequired()], render_kw={
         "placeholder": "example.com"})
     submit = SubmitField('Add Domain')
+
+
+class LogFormUpload(FlaskForm):
+    log = FileField('Upload New Log', validators=[DataRequired()])
+    submit = SubmitField('Analyze Log')

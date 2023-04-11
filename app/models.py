@@ -35,5 +35,22 @@ class Domain(db.Model):
     def add_domain(self, domain):
         self.domain_name = domain
 
+    def get_domain(self, domain_id):
+        return Domain.query.filter_by(id=domain_id).first()
+
     def get_total_domains(self):
         return Domain.query.count()
+
+
+class LogStorage(db.Model):
+    __tablename__ = 'logs_storage_db'
+    id = db.Column(db.Integer, primary_key=True)
+    file_location = db.Column(db.String(255), nullable=False)
+    domain_id = db.Column(db.Integer, db.ForeignKey('domains_db.id'))
+    created_at = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return '<LogStorage {}>'.format(self.file_location)
+
+    def add_file_location(self, file_location):
+        self.file_location = file_location

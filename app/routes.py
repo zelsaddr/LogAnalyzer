@@ -2,14 +2,17 @@ from flask import render_template, flash, redirect, url_for, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from app import app, db
-from app.forms import LoginForm, DomainForm
-from app.models import User, Domain
+from app.forms import LoginForm, DomainForm, LogFormUpload
+from app.models import User, Domain, LogStorage
 
 
 @login_required
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/index', methods=['GET', 'POST'])
 def index():
+    """
+    Index page
+    """
     stats = {'total_domains': Domain().get_total_domains()}
     form = DomainForm()
     if form.validate_on_submit():
@@ -21,8 +24,21 @@ def index():
     return render_template('index.html', title='Home', form=form, stats=stats)
 
 
+@app.route('/domains/<int:domain_id>')
+def domains(domain_id):
+    """
+    Domain page
+    """
+    domain = Domain.query.get_or_404(domain_id)
+    form = LogFormUpload()
+    return render_template('domain_details.html', title='Domain', domain_details=domain, form=form)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """
+    Logs in the user
+    """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = LoginForm()
@@ -41,13 +57,39 @@ def login():
 
 @app.route('/logout')
 def logout():
+    """
+    Logs out the user
+    """
     logout_user()
     return redirect(url_for('index'))
 
 
+### FILE HANDLING ###
+# @app.route('/logUpload', methods=['POST'])
+# def logUpload():
+#     """
+#     Uploads the log file
+#     """
+
+
+### API ###
 @app.route('/api/domains_list')
 def domains_list():
+    """
+    Returns a list of domains in JSON format
+    """
     domains = Domain.query.all()
-    data = {'data': [{'id': domain.id, 'domain_name': domain.domain_name, 'actions': '<a href="/see/' + str(domain.id) + '" class="btn btn-info btn-sm">See Log</a>'}
+    data = {'data': [{'id': domain.id, 'domain_name': domain.domain_name, 'actions': '<a href="/domains/' + str(domain.id) + '" class="btn btn-info btn-sm">See Log</a>'}
             for domain in domains]}
+    return jsonify(data)
+
+
+@app.route('/api/domain_storage/<int:domain_id>')
+def domain_storage(domain_id):
+    """
+    Returns a list of log files for a domain in JSON format
+    """
+    Logs = LogStorage.query.filter_by(domain_id=domain_id).all()
+    data = {'data': [{'id': log.id, 'file_location': log.file_location, 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+            for log in Logs]}
     return jsonify(data)
