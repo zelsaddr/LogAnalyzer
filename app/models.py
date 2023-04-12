@@ -46,7 +46,8 @@ class LogStorage(db.Model):
     __tablename__ = 'logs_storage_db'
     id = db.Column(db.Integer, primary_key=True)
     file_location = db.Column(db.String(255), nullable=False)
-    domain_id = db.Column(db.Integer, db.ForeignKey('domains_db.id'))
+    domain_id = db.Column(db.Integer, db.ForeignKey(
+        'domains_db.id'), nullable=False)
     created_at = db.Column(db.DateTime)
 
     def __repr__(self):
@@ -54,3 +55,12 @@ class LogStorage(db.Model):
 
     def add_file_location(self, file_location):
         self.file_location = file_location
+
+    def add_domain_id(self, domain_id):
+        self.domain_id = domain_id
+
+    def add_created_at(self, created_at):
+        self.created_at = created_at
+
+    def get_total_logs(self):
+        return LogStorage.query.count()

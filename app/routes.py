@@ -4,16 +4,19 @@ from werkzeug.urls import url_parse
 from app import app, db
 from app.forms import LoginForm, DomainForm, LogFormUpload
 from app.models import User, Domain, LogStorage
+import os
+from datetime import datetime
 
 
-@login_required
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/index', methods=['GET', 'POST'])
+@login_required
 def index():
     """
     Index page
     """
-    stats = {'total_domains': Domain().get_total_domains()}
+    stats = {'total_domains': Domain().get_total_domains(),
+             'total_logs': LogStorage().get_total_logs()}
     form = DomainForm()
     if form.validate_on_submit():
         domain = Domain(domain_name=form.domain.data)
@@ -25,12 +28,13 @@ def index():
 
 
 @app.route('/domains/<int:domain_id>')
+@login_required
 def domains(domain_id):
     """
     Domain page
     """
     domain = Domain.query.get_or_404(domain_id)
-    form = LogFormUpload()
+    form = LogFormUpload(domain_id=domain_id)
     return render_template('domain_details.html', title='Domain', domain_details=domain, form=form)
 
 
@@ -65,15 +69,30 @@ def logout():
 
 
 ### FILE HANDLING ###
-# @app.route('/logUpload', methods=['POST'])
-# def logUpload():
-#     """
-#     Uploads the log file
-#     """
-
+@app.route('/logUpload', methods=['POST'])
+def logUpload():
+    """
+    Uploads the log file
+    """
+    form = LogFormUpload()
+    if form.validate_on_submit():
+        log_file = form.log.data
+        filename = log_file.filename
+        upload_path = app.config['UPLOAD_PATH']
+        log_file.save(os.path.join(upload_path, filename))
+        logs = LogStorage(file_location=filename, domain_id=form.domain_id.data,
+                          created_at=datetime.now())
+        # return str(x)
+        db.session.add(logs)
+        db.session.commit()
+        flash('Log file uploaded!')
+        return redirect('domains/' + str(form.domain_id.data) + '')
 
 ### API ###
+
+
 @app.route('/api/domains_list')
+@login_required
 def domains_list():
     """
     Returns a list of domains in JSON format
@@ -85,6 +104,7 @@ def domains_list():
 
 
 @app.route('/api/domain_storage/<int:domain_id>')
+@login_required
 def domain_storage(domain_id):
     """
     Returns a list of log files for a domain in JSON format

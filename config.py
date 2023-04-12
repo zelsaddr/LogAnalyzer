@@ -9,3 +9,5 @@ class Config:
     TEMPLATES_AUTO_RELOAD = True
     DEBUG = True
     TESTING = True
+    UPLOAD_PATH = os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), 'uploads')

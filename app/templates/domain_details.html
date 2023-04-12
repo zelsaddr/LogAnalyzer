@@ -3,8 +3,9 @@
   <div class="card h-100">
     <div class="card-body">
       <h5 class="card-title">Domains : {{ domain_details.domain_name }}</h5>
-      <form method="POST" enctype="multipart/form-data">
+      <form method="POST" action="{{ url_for('logUpload') }}" enctype="multipart/form-data">
         {{ form.hidden_tag() }}
+        <!-- <input type="hidden" name="domain_id" value="{{ domain_details.id }}" /> -->
         <div class="form-group">{{ form.log.label(class='form-control-label') }} {{ form.log(class='form-control') }}</div>
         <div class="form-group">{{ form.submit(class='btn btn-primary') }}</div>
       </form>
