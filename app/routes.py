@@ -1,10 +1,12 @@
 from flask import render_template, flash, redirect, url_for, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
+from urllib.parse import unquote
 from app import app, db
 from app.forms import LoginForm, DomainForm, LogFormUpload
 from app.models import User, Domain, LogStorage
 import os
+import re
 from datetime import datetime
 
 
@@ -91,6 +93,38 @@ def logUpload():
 ### API ###
 
 
+@app.route('/api/parse_log_file/<int:log_id>')
+@login_required
+def parse_log_file(log_id):
+    """
+    Returns a list of log file data in JSON format
+    """
+    log = LogStorage.query.get_or_404(log_id)
+    data = {'data': [{'id': log.id, 'file_location': log.file_location,
+                      'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')}]}
+    with open(os.path.join(app.config['UPLOAD_PATH'], log.file_location), 'r') as f:
+        datas = f.read()
+        pattern = r'(\S+) (\S+) (\S+) \[(.*?)\] "(\S+) (\S+) (\S+)" (\S+) (\S+) "(\S+)" "(.*?)"'
+        all_logs_parsed = []
+        for x in datas.split('\n'):
+            match = re.search(pattern, x)
+            if match:
+                all_logs_parsed.append(
+                    {
+                        'ip_address': str(match.group(1)),
+                        'method': str(match.group(5)),
+                        'path': unquote(str(match.group(6))),
+                        'status_code': str(match.group(8)),
+                        'http_version': str(match.group(7)),
+                        'user_agent': str(match.group(11)),
+                        'date_str': str(datetime.strptime(match.group(4), '%d/%b/%Y:%H:%M:%S %z').date())
+                    }
+                )
+        data['data'][0]['logs'] = all_logs_parsed
+
+    return jsonify(data)
+
+
 @app.route('/api/domains_list')
 @login_required
 def domains_list():
@@ -110,6 +144,6 @@ def domain_storage(domain_id):
     Returns a list of log files for a domain in JSON format
     """
     Logs = LogStorage.query.filter_by(domain_id=domain_id).all()
-    data = {'data': [{'id': log.id, 'file_location': log.file_location, 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+    data = {'data': [{'id': log.id, 'file_location': log.file_location, 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S'), 'analyze_btn': '<a href="/analyze_log_file/' + str(log.id) + '" class="btn btn-warning btn-sm">Analyze</a>', 'delete_btn': '<a href="/delete_log_file/' + str(log.id) + '" class="btn btn-danger btn-sm">Delete</a>'}
             for log in Logs]}
     return jsonify(data)

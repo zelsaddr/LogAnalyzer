@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 12, 2023 at 02:30 AM
+-- Generation Time: May 19, 2023 at 12:44 PM
 -- Server version: 10.4.27-MariaDB
 -- PHP Version: 8.1.12
 
@@ -38,7 +38,9 @@ CREATE TABLE `domains_db` (
 
 INSERT INTO `domains_db` (`id`, `domain_name`) VALUES
 (1, 'google.com'),
-(2, 'ppdb.sman4tangerang.sch.id');
+(2, 'ppdb.sman4tangerang.sch.id'),
+(3, 'zeldin.tech'),
+(4, 'perpus.sman4tangerang.sch.id');
 
 -- --------------------------------------------------------
 
@@ -70,6 +72,7 @@ CREATE TABLE `logs_storage_db` (
   `id` int(11) NOT NULL,
   `file_location` text NOT NULL,
   `domain_id` int(13) NOT NULL,
+  `analyzed` int(1) NOT NULL,
   `created_at` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -77,12 +80,9 @@ CREATE TABLE `logs_storage_db` (
 -- Dumping data for table `logs_storage_db`
 --
 
-INSERT INTO `logs_storage_db` (`id`, `file_location`, `domain_id`, `created_at`) VALUES
-(1, 'sssss', 1, '2023-04-12'),
-(2, 'sssssxxx', 1, '2023-04-12'),
-(3, 'sman4tangerang.sch.id.ppdb.log.1', 1, '2023-04-12'),
-(4, 'sman4tangerang.sch.id.ppdb.log.1', 1, '2023-04-12'),
-(5, 'sman4tangerang.sch.id.ppdb.log.1', 2, '2023-04-12');
+INSERT INTO `logs_storage_db` (`id`, `file_location`, `domain_id`, `analyzed`, `created_at`) VALUES
+(5, 'sman4tangerang.sch.id.ppdb.log.1', 2, 0, '2023-04-12'),
+(6, 'sman4tangerang.sch.id.perpus.log.1', 4, 0, '2023-05-16');
 
 -- --------------------------------------------------------
 
@@ -152,7 +152,7 @@ ALTER TABLE `user_db`
 -- AUTO_INCREMENT for table `domains_db`
 --
 ALTER TABLE `domains_db`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `logs_details_db`
@@ -164,7 +164,7 @@ ALTER TABLE `logs_details_db`
 -- AUTO_INCREMENT for table `logs_storage_db`
 --
 ALTER TABLE `logs_storage_db`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `user_db`

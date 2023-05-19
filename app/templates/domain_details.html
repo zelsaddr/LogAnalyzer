@@ -21,6 +21,8 @@
           <th>ID</th>
           <th>File Location</th>
           <th>Uploaded at</th>
+          <th>Analyze</th>
+          <th>Delete</th>
         </tr>
       </thead>
     </table>
@@ -37,7 +39,7 @@
     $("#domains-table").DataTable({
       responsive: true,
       ajax: "/api/domain_storage/{{ domain_details.id }}",
-      columns: [{ data: "id" }, { data: "file_location" }, { data: "created_at" }],
+      columns: [{ data: "id" }, { data: "file_location" }, { data: "created_at" }, { data: "analyze_btn" }, { data: "delete_btn" }],
     });
   });
 </script>

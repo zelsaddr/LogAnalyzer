@@ -48,6 +48,7 @@ class LogStorage(db.Model):
     file_location = db.Column(db.String(255), nullable=False)
     domain_id = db.Column(db.Integer, db.ForeignKey(
         'domains_db.id'), nullable=False)
+    analyzed = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime)
 
     def __repr__(self):

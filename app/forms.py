@@ -19,4 +19,4 @@ class DomainForm(FlaskForm):
 class LogFormUpload(FlaskForm):
     domain_id = HiddenField('Domain ID', validators=[DataRequired()])
     log = FileField('Upload New Log', validators=[DataRequired()])
-    submit = SubmitField('Analyze Log')
+    submit = SubmitField('Upload Log File')
