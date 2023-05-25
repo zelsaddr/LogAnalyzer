@@ -2,9 +2,10 @@ from flask import render_template, flash, redirect, url_for, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from urllib.parse import unquote
+import asyncio
 from app import app, db
 from app.forms import LoginForm, DomainForm, LogFormUpload
-from app.models import User, Domain, LogStorage
+from app.models import User, Domain, LogStorage, Patterns, LogsDetails
 import os
 import re
 from datetime import datetime
@@ -100,17 +101,18 @@ def parse_log_file(log_id):
     Returns a list of log file data in JSON format
     """
     log = LogStorage.query.get_or_404(log_id)
-    data = {'data': [{'id': log.id, 'file_location': log.file_location,
+    data = {'data': [{'id': log.id, 'file_location': log.file_location, 'domain_id': log.domain_id,
                       'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')}]}
     with open(os.path.join(app.config['UPLOAD_PATH'], log.file_location), 'r') as f:
         datas = f.read()
         pattern = r'(\S+) (\S+) (\S+) \[(.*?)\] "(\S+) (\S+) (\S+)" (\S+) (\S+) "(\S+)" "(.*?)"'
         all_logs_parsed = []
         for x in datas.split('\n'):
-            match = re.search(pattern, x)
-            if match:
-                all_logs_parsed.append(
-                    {
+            try:
+                match = re.search(pattern, x)
+                if match:
+                    obj_parsed = {
+                        'raw_text': str(x),
                         'ip_address': str(match.group(1)),
                         'method': str(match.group(5)),
                         'path': unquote(str(match.group(6))),
@@ -119,8 +121,35 @@ def parse_log_file(log_id):
                         'user_agent': str(match.group(11)),
                         'date_str': str(datetime.strptime(match.group(4), '%d/%b/%Y:%H:%M:%S %z').date())
                     }
-                )
+                    all_logs_parsed.append(
+                        obj_parsed
+                    )
+                    patternss = Patterns.query.all()
+                    log_type = 'not_found'
+                    for dd in patternss:
+                        if re.search(r"%s" % dd.pattern_syntax, obj_parsed['path'], re.IGNORECASE):
+                            log_type = dd.pattern_name
+                            break
+                    toDb = LogsDetails(
+                        domain_id=data['data'][0]['domain_id'],
+                        logs_storage_id=data['data'][0]['id'],
+                        log_text=str(x),
+                        ip_address=obj_parsed['ip_address'],
+                        date=obj_parsed['date_str'],
+                        method=obj_parsed['method'],
+                        url=obj_parsed['path'],
+                        status_code=obj_parsed['status_code'],
+                        user_agent=obj_parsed['user_agent'],
+                        log_type=log_type
+                    )
+                    db.session.add(toDb)
+                    db.session.commit()
+
+            except Exception as e:
+                return str(e)
         data['data'][0]['logs'] = all_logs_parsed
+        log.analyzed = 1
+        db.session.commit()
 
     return jsonify(data)
 
@@ -144,6 +173,13 @@ def domain_storage(domain_id):
     Returns a list of log files for a domain in JSON format
     """
     Logs = LogStorage.query.filter_by(domain_id=domain_id).all()
-    data = {'data': [{'id': log.id, 'file_location': log.file_location, 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S'), 'analyze_btn': '<a href="/analyze_log_file/' + str(log.id) + '" class="btn btn-warning btn-sm">Analyze</a>', 'delete_btn': '<a href="/delete_log_file/' + str(log.id) + '" class="btn btn-danger btn-sm">Delete</a>'}
+    data = {
+        'data': [
+            {
+                'id': log.id,
+                'file_location': log.file_location,
+                'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'analyze_btn': '<button id="' + str(log.id) + '" class="btn btn-warning btn-sm analyze-btn">Analyze</button>' if log.analyzed == 0 else '<button class="btn btn-success btn-sm" readonly>Analyzed</a>',
+                'delete_btn': '<a href="/delete_log_file/' + str(log.id) + '" class="btn btn-danger btn-sm">Delete</a>'}
             for log in Logs]}
     return jsonify(data)

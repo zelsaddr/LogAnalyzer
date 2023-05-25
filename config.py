@@ -11,3 +11,4 @@ class Config:
     TESTING = True
     UPLOAD_PATH = os.path.join(os.path.dirname(
         os.path.abspath(__file__)), 'uploads')
+    TIMEOUT = 60

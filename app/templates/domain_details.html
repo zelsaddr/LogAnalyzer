@@ -26,6 +26,9 @@
         </tr>
       </thead>
     </table>
+    <div class="loading-overlay">
+      <div class="loading-spinner"></div>
+    </div>
   </div>
 </div>
 {% endblock %} {% block scripts %}
@@ -40,6 +43,10 @@
       responsive: true,
       ajax: "/api/domain_storage/{{ domain_details.id }}",
       columns: [{ data: "id" }, { data: "file_location" }, { data: "created_at" }, { data: "analyze_btn" }, { data: "delete_btn" }],
+    });
+    $(".analyze-btn").click(function () {
+      var id = $(this).attr("id");
+      console.log(id);
     });
   });
 </script>

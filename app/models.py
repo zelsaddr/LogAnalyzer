@@ -46,8 +46,7 @@ class LogStorage(db.Model):
     __tablename__ = 'logs_storage_db'
     id = db.Column(db.Integer, primary_key=True)
     file_location = db.Column(db.String(255), nullable=False)
-    domain_id = db.Column(db.Integer, db.ForeignKey(
-        'domains_db.id'), nullable=False)
+    domain_id = db.Column(db.Integer, nullable=False)
     analyzed = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime)
 
@@ -65,3 +64,73 @@ class LogStorage(db.Model):
 
     def get_total_logs(self):
         return LogStorage.query.count()
+
+
+class Patterns(db.Model):
+    __tablename__ = 'patterns_db'
+    id = db.Column(db.Integer, primary_key=True)
+    pattern_name = db.Column(db.String(50), nullable=False)
+    pattern_syntax = db.Column(db.String(255), nullable=False)
+
+    def __repr__(self):
+        return '<Patterns {}>'.format(self.pattern)
+
+    def add_pattern(self, pattern):
+        self.pattern = pattern
+
+    def get_total_patterns(self):
+        return Patterns.query.count()
+
+
+class LogsDetails(db.Model):
+    __tablename__ = 'logs_details_db'
+    id = db.Column(db.Integer, primary_key=True)
+    domain_id = db.Column(db.Integer)
+    logs_storage_id = db.Column(db.Integer)
+    log_text = db.Column(db.String(255))
+    ip_address = db.Column(db.String(100))
+    date = db.Column(db.String(255))
+    method = db.Column(db.String(255))
+    url = db.Column(db.String(255))
+    status_code = db.Column(db.String(30))
+    user_agent = db.Column(db.String(255))
+    log_type = db.Column(db.String(255))
+
+    def __repr__(self):
+        return '<LogsDetails {}>'.format(self.log_text)
+
+    def add_domain_id(self, domain_id):
+        self.domain_id = domain_id
+
+    def add_logs_storage_id(self, logs_storage_id):
+        self.logs_storage_id = logs_storage_id
+
+    def add_log_text(self, log_text):
+        self.log_text = log_text
+
+    def add_ip_address(self, ip_address):
+        self.ip_address = ip_address
+
+    def add_date(self, date):
+        self.date = date
+
+    def add_method(self, method):
+        self.method = method
+
+    def add_url(self, url):
+        self.url = url
+
+    def add_status_code(self, status_code):
+        self.status_code = status_code
+
+    def add_user_agent(self, user_agent):
+        self.user_agent = user_agent
+
+    def add_log_type(self, log_type):
+        self.log_type = log_type
+
+    def get_total_logs_details(self):
+        return LogsDetails.query.count()
+
+    def get_total_logs_details_by_domain(self, domain_id):
+        return LogsDetails.query.filter_by(domain_id=domain_id).count()
