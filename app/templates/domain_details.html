@@ -1,5 +1,34 @@
 {% extends 'base.html' %} {% block title %}Home{% endblock %} {% block content %}
 <div>
+  <div class="row">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Domains Added</h5>
+          <p class="card-text">111</p>
+          <a href="#" class="btn btn-primary btn-sm">See More</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Total Log Files on DB</h5>
+          <p class="card-text">1111</p>
+          <a href="#" class="btn btn-primary btn-sm">See More</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Total Malicious Activity</h5>
+          <p class="card-text">111</p>
+          <a href="#" class="btn btn-primary btn-sm">Learn More</a>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="card h-100">
     <div class="card-body">
       <h5 class="card-title">Domains : {{ domain_details.domain_name }}</h5>
@@ -19,15 +48,15 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>File Location</th>
+          <th>File Name</th>
           <th>Uploaded at</th>
           <th>Analyze</th>
           <th>Delete</th>
         </tr>
       </thead>
     </table>
-    <div class="loading-overlay">
-      <div class="loading-spinner"></div>
+    <div class="overlay" style="display: none">
+      <div class="custom-loader"></div>
     </div>
   </div>
 </div>
@@ -39,14 +68,65 @@
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
 <script>
   $(document).ready(function () {
+    let domain_id = "{{ domain_details.id }}";
     $("#domains-table").DataTable({
       responsive: true,
-      ajax: "/api/domain_storage/{{ domain_details.id }}",
-      columns: [{ data: "id" }, { data: "file_location" }, { data: "created_at" }, { data: "analyze_btn" }, { data: "delete_btn" }],
+      ajax: "/api/domain_storage/" + domain_id,
+      columns: [
+        { data: "id" },
+        { data: "file_location" },
+        { data: "created_at" },
+        {
+          data: null,
+          render: function (data, type, row) {
+            if (data.log_analyzed) return '<button data-id="' + row.id + '" data-action="see_log" class="btn btn-success form-control btn-sm analyze-btn">Analyzed</button>';
+            return '<button data-id="' + row.id + '" data-action="analyze" class="btn btn-primary btn-sm form-control analyze-btn">Analyze</button>';
+          },
+        },
+        {
+          data: null,
+          render: function (data, type, row) {
+            return '<button data-id="' + row.id + '" data-action="delete_log" class="btn btn-danger btn-sm form-control delete-btn">Delete</button>';
+          },
+        },
+      ],
     });
-    $(".analyze-btn").click(function () {
-      var id = $(this).attr("id");
-      console.log(id);
+    $("#domains-table").on("click", "button", function () {
+      let action = $(this).data("action");
+      let id = $(this).data("id");
+      if (action == "analyze") {
+        $(".overlay").show();
+        $.ajax({
+          url: "/api/parse_log_file/" + id,
+          type: "GET",
+          success: function (data) {
+            if (data.status == "success") {
+              $(".overlay").hide();
+              alert("Log Analyzed Successfully");
+              $("#domains-table").DataTable().ajax.reload();
+            } else {
+              alert("Something went wrong");
+            }
+          },
+        });
+      } else if (action == "delete_log") {
+        $(".overlay").show();
+        $.ajax({
+          url: "/api/delete_log/" + id,
+          type: "DELETE",
+          success: function (data) {
+            if (data.status == "success") {
+              $(".overlay").hide();
+              alert("Log Deleted Successfully");
+              $("#domains-table").DataTable().ajax.reload();
+            } else {
+              alert("Something went wrong");
+            }
+          },
+        });
+      } else if (action == "see_log") {
+        window.location.href = "/log_details/" + id;
+      }
     });
   });
 </script>

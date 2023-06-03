@@ -2,6 +2,7 @@ from flask import render_template, flash, redirect, url_for, request, jsonify
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from urllib.parse import unquote
+import concurrent.futures
 import asyncio
 from app import app, db
 from app.forms import LoginForm, DomainForm, LogFormUpload
@@ -9,6 +10,7 @@ from app.models import User, Domain, LogStorage, Patterns, LogsDetails
 import os
 import re
 from datetime import datetime
+import time
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -100,6 +102,7 @@ def parse_log_file(log_id):
     """
     Returns a list of log file data in JSON format
     """
+    start_time = time.time()
     log = LogStorage.query.get_or_404(log_id)
     data = {'data': [{'id': log.id, 'file_location': log.file_location, 'domain_id': log.domain_id,
                       'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')}]}
@@ -107,12 +110,13 @@ def parse_log_file(log_id):
         datas = f.read()
         pattern = r'(\S+) (\S+) (\S+) \[(.*?)\] "(\S+) (\S+) (\S+)" (\S+) (\S+) "(\S+)" "(.*?)"'
         all_logs_parsed = []
-        for x in datas.split('\n'):
+
+        def parse_log_line(line):
             try:
-                match = re.search(pattern, x)
+                match = re.search(pattern, line)
                 if match:
                     obj_parsed = {
-                        'raw_text': str(x),
+                        'raw_text': str(line),
                         'ip_address': str(match.group(1)),
                         'method': str(match.group(5)),
                         'path': unquote(str(match.group(6))),
@@ -121,33 +125,41 @@ def parse_log_file(log_id):
                         'user_agent': str(match.group(11)),
                         'date_str': str(datetime.strptime(match.group(4), '%d/%b/%Y:%H:%M:%S %z').date())
                     }
-                    all_logs_parsed.append(
-                        obj_parsed
-                    )
-                    patternss = Patterns.query.all()
-                    log_type = 'not_found'
-                    for dd in patternss:
-                        if re.search(r"%s" % dd.pattern_syntax, obj_parsed['path'], re.IGNORECASE):
-                            log_type = dd.pattern_name
-                            break
-                    toDb = LogsDetails(
-                        domain_id=data['data'][0]['domain_id'],
-                        logs_storage_id=data['data'][0]['id'],
-                        log_text=str(x),
-                        ip_address=obj_parsed['ip_address'],
-                        date=obj_parsed['date_str'],
-                        method=obj_parsed['method'],
-                        url=obj_parsed['path'],
-                        status_code=obj_parsed['status_code'],
-                        user_agent=obj_parsed['user_agent'],
-                        log_type=log_type
-                    )
-                    db.session.add(toDb)
-                    db.session.commit()
-
+                    with app.app_context():
+                        patternss = Patterns.query.all()
+                        log_type = 'not_found'
+                        for dd in patternss:
+                            if re.search(r"%s" % dd.pattern_syntax, obj_parsed['path'], re.IGNORECASE):
+                                log_type = dd.pattern_name
+                                break
+                        toDb = LogsDetails(
+                            domain_id=data['data'][0]['domain_id'],
+                            logs_storage_id=data['data'][0]['id'],
+                            log_text=str(line),
+                            ip_address=obj_parsed['ip_address'],
+                            date=obj_parsed['date_str'],
+                            method=obj_parsed['method'],
+                            url=obj_parsed['path'],
+                            status_code=obj_parsed['status_code'],
+                            user_agent=obj_parsed['user_agent'],
+                            log_type=log_type
+                        )
+                        db.session.add(toDb)
+                        db.session.commit()
+                    return obj_parsed
             except Exception as e:
                 return str(e)
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results = executor.map(parse_log_line, datas.split('\n'))
+            for result in results:
+                if result:
+                    all_logs_parsed.append(result)
+        end_time = time.time()
+        execution_time = end_time - start_time
         data['data'][0]['logs'] = all_logs_parsed
+        data['status'] = 'success'
+        data['execution_time'] = execution_time
         log.analyzed = 1
         db.session.commit()
 
@@ -179,7 +191,23 @@ def domain_storage(domain_id):
                 'id': log.id,
                 'file_location': log.file_location,
                 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                'analyze_btn': '<button id="' + str(log.id) + '" class="btn btn-warning btn-sm analyze-btn">Analyze</button>' if log.analyzed == 0 else '<button class="btn btn-success btn-sm" readonly>Analyzed</a>',
-                'delete_btn': '<a href="/delete_log_file/' + str(log.id) + '" class="btn btn-danger btn-sm">Delete</a>'}
+                'log_analyzed': log.analyzed,
+            }
             for log in Logs]}
     return jsonify(data)
+
+
+@app.route('/api/delete_log/<int:log_id>', methods=['DELETE'])
+@login_required
+def delete_log(log_id):
+    """
+    Deletes a log file
+    """
+    try:
+        LogsDetails.query.filter_by(logs_storage_id=log_id).delete()
+        db.session.commit()
+        LogStorage.query.filter_by(id=log_id).delete()
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
