@@ -1,5 +1,5 @@
 from flask import render_template, flash, redirect, url_for, request, jsonify
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, not_
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from urllib.parse import unquote
@@ -68,10 +68,28 @@ def log_details(log_id):
         'total_lines_executed': 0,
         'malicious_activity': 0,
         'total_log_files': 0,
-
     }
     log = LogStorage.query.get_or_404(log_id)
     get_domain = Domain.query.get_or_404(log.domain_id)
+
+    # Query to count URLs excluding certain extensions
+    excluded_keywords = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', 'AJAX', '.woff', 'robots.txt']
+
+    # Query to get the URL with the highest count, excluding certain file extensions
+    url_count = db.session.query(LogsDetails.url, func.count(LogsDetails.url).label('count')).\
+        filter(LogsDetails.logs_storage_id == log.id).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[0] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[1] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[2] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[3] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[4] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[5] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[6] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[7] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[8] + '%'))).\
+        group_by(LogsDetails.url).order_by(func.count(LogsDetails.url).desc()).limit(6).all()
+    
+    print(url_count)
     # Get the search term from the query string
     search_term = request.args.get('search', '')
 
