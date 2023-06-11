@@ -134,3 +134,4 @@ class LogsDetails(db.Model):
 
     def get_total_logs_details_by_domain(self, domain_id):
         return LogsDetails.query.filter_by(domain_id=domain_id).count()
+

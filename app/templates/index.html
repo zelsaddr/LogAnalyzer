@@ -22,7 +22,7 @@
     <div class="card h-100">
       <div class="card-body">
         <h5 class="card-title">Total Malicious Activity</h5>
-        <p class="card-text">1000</p>
+        <p class="card-text">{{ stats.total_malicious }}</p>
         <a href="#" class="btn btn-primary btn-sm">Learn More</a>
       </div>
     </div>
@@ -42,16 +42,19 @@
 </div>
 <div class="card mt-3">
   <div class="card-body">
-    <h5 class="card-title">Domains List</h5>
+    <h5 class="card-title"><i class="fa fa-list"></i> Domains List</h5>
     <table id="domains-table" class="table table-striped table-bordered nowrap">
       <thead>
         <tr>
-          <th>ID</th>
           <th>Domain</th>
           <th>Action</th>
+          <th>Delete</th>
         </tr>
       </thead>
     </table>
+    <div class="overlay" style="display: none">
+      <div class="custom-loader"></div>
+    </div>
   </div>
 </div>
 {% endblock %} {% block scripts %}
@@ -65,7 +68,43 @@
     $("#domains-table").DataTable({
       responsive: true,
       ajax: "/api/domains_list",
-      columns: [{ data: "id" }, { data: "domain_name" }, { data: "actions" }],
+      columns: [
+        { data: "domain_name" },
+        {
+          data: null,
+          render: function (data, type, row) {
+            return '<button data-id="' + row.id + '" data-action="see_domain" class="btn btn-primary btn-sm form-control see-btn"><i class="fa fa-eye"></i> See Details</button>';
+          },
+        },
+        {
+          data: null,
+          render: function (data, type, row) {
+            return '<button data-id="' + row.id + '" data-action="delete_domain" class="btn btn-danger btn-sm form-control delete-btn"><i class="fa fa-trash"></i> Delete</button>';
+          },
+        },
+      ],
+    });
+    $("#domains-table").on("click", "button", function () {
+      let action = $(this).data("action");
+      let id = $(this).data("id");
+      if (action == "see_domain") {
+        window.location.href = "/domains/" + id;
+      } else if (action == "delete_domain") {
+        $(".overlay").show();
+        $.ajax({
+          url: "/api/delete_domain/" + id,
+          type: "DELETE",
+          success: function (data) {
+            if (data.status == "success") {
+              $(".overlay").hide();
+              alert("Domain Deleted Successfully");
+              $("#domains-table").DataTable().ajax.reload();
+            } else {
+              alert("Something went wrong");
+            }
+          },
+        });
+      }
     });
   });
 </script>

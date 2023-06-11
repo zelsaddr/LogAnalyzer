@@ -1,4 +1,5 @@
 from flask import render_template, flash, redirect, url_for, request, jsonify
+from sqlalchemy import func, or_
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
 from urllib.parse import unquote
@@ -21,7 +22,9 @@ def index():
     Index page
     """
     stats = {'total_domains': Domain().get_total_domains(),
-             'total_logs': LogStorage().get_total_logs()}
+             'total_logs': LogStorage().get_total_logs(),
+             'total_malicious': LogsDetails.query.filter(LogsDetails.log_type != 'not_found').count()
+             }
     form = DomainForm()
     if form.validate_on_submit():
         domain = Domain(domain_name=form.domain.data)
@@ -40,7 +43,57 @@ def domains(domain_id):
     """
     domain = Domain.query.get_or_404(domain_id)
     form = LogFormUpload(domain_id=domain_id)
-    return render_template('domain_details.html', title='Domain', domain_details=domain, form=form)
+    get_all_logsdetails = LogsDetails.query.filter_by(
+        domain_id=domain_id).count()
+    get_all_logsdetails_malicious = LogsDetails.query.filter(
+        LogsDetails.domain_id == domain_id, LogsDetails.log_type != 'not_found').count()
+    get_total_logfiles = LogStorage.query.filter_by(
+        domain_id=domain_id).count()
+    all_status = {
+        'total_lines_executed': get_all_logsdetails,
+        'malicious_activity': get_all_logsdetails_malicious,
+        'total_log_files': get_total_logfiles,
+
+    }
+    return render_template('domain_details.html', title='Domain', domain_details=domain, form=form, all_status=all_status)
+
+
+@app.route('/log_details/<int:log_id>')
+@login_required
+def log_details(log_id):
+    """
+    Log details page
+    """
+    all_status = {
+        'total_lines_executed': 0,
+        'malicious_activity': 0,
+        'total_log_files': 0,
+
+    }
+    log = LogStorage.query.get_or_404(log_id)
+    get_domain = Domain.query.get_or_404(log.domain_id)
+    # Get the search term from the query string
+    search_term = request.args.get('search', '')
+
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+
+    # Apply search term filter if provided
+    query = LogsDetails.query
+    query = query.filter(LogsDetails.logs_storage_id == log_id).order_by(
+        LogsDetails.log_type != 'not_found')
+    if search_term:
+        query = query.filter(or_(func.lower(
+            LogsDetails.url).ilike(f"%{search_term.lower()}%"), func.lower(LogsDetails.log_type).ilike(f"%{search_term.lower()}%")), LogsDetails.logs_storage_id == log_id)
+
+    # Get the total count of records
+    total_count = query.count()
+
+    # Apply pagination
+    log_details = query.paginate(page=page, per_page=per_page)
+
+    return render_template('log_details.html', domain_details=get_domain, log_info=log, log_details=log_details, all_status=all_status, total_count=total_count, search_keyword=search_term)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -173,9 +226,27 @@ def domains_list():
     Returns a list of domains in JSON format
     """
     domains = Domain.query.all()
-    data = {'data': [{'id': domain.id, 'domain_name': domain.domain_name, 'actions': '<a href="/domains/' + str(domain.id) + '" class="btn btn-info btn-sm">See Log</a>'}
+    data = {'data': [{'id': domain.id, 'domain_name': domain.domain_name}
             for domain in domains]}
     return jsonify(data)
+
+
+@app.route('/api/delete_domain/<int:domain_id>', methods=['DELETE'])
+@login_required
+def delete_domain(domain_id):
+    """
+    Deletes a domain
+    """
+    try:
+        LogsDetails.query.filter_by(logs_storage_id=domain_id).delete()
+        db.session.commit()
+        LogStorage.query.filter_by(domain_id=domain_id).delete()
+        db.session.commit()
+        Domain.query.filter_by(id=domain_id).delete()
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 
 @app.route('/api/domain_storage/<int:domain_id>')
@@ -192,6 +263,7 @@ def domain_storage(domain_id):
                 'file_location': log.file_location,
                 'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 'log_analyzed': log.analyzed,
+                'total_lines': LogsDetails.query.filter_by(logs_storage_id=log.id).count(),
             }
             for log in Logs]}
     return jsonify(data)

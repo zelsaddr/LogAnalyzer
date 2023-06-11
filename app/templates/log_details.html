@@ -1,0 +1,200 @@
+{% extends 'base.html' %} {% block title %}Home{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="/domains/{{ domain_details.id }}">{{ domain_details.domain_name }} (domain)</a></li>
+<li class="breadcrumb-item active" aria-current="page">{{ log_info.file_location }} (log file)</li>
+{% endblock %}
+{% block content %}
+<div>
+  <div class="row">
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Total Lines Executed</h5>
+          <p class="card-text">{{ all_status['total_lines_executed'] }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Total Log Files on DB</h5>
+          <p class="card-text">{{ all_status['total_log_files'] }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Total Malicious Activity</h5>
+          <p class="card-text">{{ all_status['malicious_activity'] }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card h-100">
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-8">
+          <h5 class="card-title">Domain : {{ domain_details.domain_name }}</h5>
+        </div>
+        <div class="col-md-4">
+          <p class="card-title">Log File : <span class="badge badge-success">{{ log_info.file_location }}</span><br>Log Uploaded : <span class="badge badge-info">{{ log_info.created_at }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title"><i class="fa fa-list"></i> Log Details</h5>
+    <hr />
+    <!-- Search form -->
+    <form method="GET" action="{{ request.path }}">
+      <div class="row mb-3">
+        <div class="col-md-10">
+          <input type="text" name="search" class="form-control" placeholder="Search by path" value="{{ search_keyword }}" />
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary form-control"><i class="fa fa-search"></i> Search</button>
+        </div>
+      </div>
+    </form>
+    <hr />
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered nowrap">
+        <thead>
+          <tr>
+            <th>IP Address</th>
+            <th>Date</th>
+            <th>Method</th>
+            <th>Path</th>
+            <th>Status Code</th>
+            <th>Log Type</th>
+            <th>User Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in log_details.items %}
+          <tr>
+            <td>{{ log.ip_address }}</td>
+            <td>{{ log.date }}</td>
+            <td>{{ log.method }}</td>
+            <td>{{ log.url }}</td>
+            <td>{{ log.status_code }}</td>
+            <td>{{ log.log_type }}</td>
+            <td>{{ log.user_agent }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination links -->
+    <nav aria-label="Pagination">
+      <ul class="pagination">
+        {% if log_details.has_prev %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ log_details.prev_num }}&search={{ search_keyword }}">Previous</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Previous</span>
+        </li>
+        {% endif %} {% for page in log_details.iter_pages() %} {% if page %} {% if log_details.page == page %}
+        <li class="page-item active">
+          <span class="page-link">{{ page }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page }}&search={{ search_keyword }}">{{ page }}</a>
+        </li>
+        {% endif %} {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">...</span>
+        </li>
+        {% endif %} {% endfor %} {% if log_details.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ log_details.next_num }}&search={{ search_keyword }}">Next</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Next</span>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+    <div class="overlay" style="display: none">
+      <div class="custom-loader"></div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script src="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap4.min.css"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
+<!-- <script>
+  $(document).ready(function () {
+    let domain_id = "{{ domain_details.id }}";
+    $("#domains-table").DataTable({
+      responsive: true,
+      ajax: "/api/domain_storage/" + domain_id,
+      columns: [
+        { data: "id" },
+        { data: "file_location" },
+        { data: "created_at" },
+        {
+          data: null,
+          render: function (data, type, row) {
+            if (data.log_analyzed) return '<button data-id="' + row.id + '" data-action="see_log" class="btn btn-success form-control btn-sm analyze-btn"><i class="fa fa-check"></i>Analyzed</button>';
+            return '<button data-id="' + row.id + '" data-action="analyze" class="btn btn-warning btn-sm form-control analyze-btn"><i class="fa fa-search"></i> Analyze</button>';
+          },
+        },
+        {
+          data: null,
+          render: function (data, type, row) {
+            return '<button data-id="' + row.id + '" data-action="delete_log" class="btn btn-danger btn-sm form-control delete-btn"><i class="fa fa-trash"></i> Delete</button>';
+          },
+        },
+      ],
+    });
+    $("#domains-table").on("click", "button", function () {
+      let action = $(this).data("action");
+      let id = $(this).data("id");
+      if (action == "analyze") {
+        $(".overlay").show();
+        $.ajax({
+          url: "/api/parse_log_file/" + id,
+          type: "GET",
+          success: function (data) {
+            if (data.status == "success") {
+              $(".overlay").hide();
+              alert("Log Analyzed Successfully with Execution time : " + data.execution_time + " seconds");
+              $("#domains-table").DataTable().ajax.reload();
+            } else {
+              alert("Something went wrong");
+            }
+          },
+        });
+      } else if (action == "delete_log") {
+        $(".overlay").show();
+        $.ajax({
+          url: "/api/delete_log/" + id,
+          type: "DELETE",
+          success: function (data) {
+            if (data.status == "success") {
+              $(".overlay").hide();
+              alert("Log Deleted Successfully");
+              $("#domains-table").DataTable().ajax.reload();
+            } else {
+              alert("Something went wrong");
+            }
+          },
+        });
+      } else if (action == "see_log") {
+        window.location.href = "/log_details/" + id;
+      }
+    });
+  });
+</script> -->
+{% endblock %}
