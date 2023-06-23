@@ -19,4 +19,11 @@ class DomainForm(FlaskForm):
 class LogFormUpload(FlaskForm):
     domain_id = HiddenField('Domain ID', validators=[DataRequired()])
     log = FileField('Upload New Log', validators=[DataRequired()])
-    
+
+
+class PatternForm(FlaskForm):
+    pattern_name = StringField('Pattern Name', validators=[
+                               DataRequired()], render_kw={"placeholder": "sqli"})
+    pattern_syntax = StringField('Pattern Syntax', validators=[
+                                 DataRequired()], render_kw={"placeholder": "union select"})
+    submit = SubmitField('Save')

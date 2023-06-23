@@ -90,20 +90,22 @@
       if (action == "see_domain") {
         window.location.href = "/domains/" + id;
       } else if (action == "delete_domain") {
-        $(".overlay").show();
-        $.ajax({
-          url: "/api/delete_domain/" + id,
-          type: "DELETE",
-          success: function (data) {
-            if (data.status == "success") {
-              $(".overlay").hide();
-              alert("Domain Deleted Successfully");
-              $("#domains-table").DataTable().ajax.reload();
-            } else {
-              alert("Something went wrong");
-            }
-          },
-        });
+        if (confirm("Are you sure you want to delete this domain?")) {
+          $(".overlay").show();
+          $.ajax({
+            url: "/api/delete_domain/" + id,
+            type: "DELETE",
+            success: function (data) {
+              if (data.status == "success") {
+                $(".overlay").hide();
+                alert("Domain Deleted Successfully");
+                $("#domains-table").DataTable().ajax.reload();
+              } else {
+                alert("Something went wrong");
+              }
+            },
+          });
+        }
       }
     });
   });

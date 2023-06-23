@@ -95,6 +95,7 @@ class LogsDetails(db.Model):
     status_code = db.Column(db.String(30))
     user_agent = db.Column(db.String(255))
     log_type = db.Column(db.String(255))
+    uagent_bot = db.Column(db.String(100))
 
     def __repr__(self):
         return '<LogsDetails {}>'.format(self.log_text)
@@ -134,4 +135,3 @@ class LogsDetails(db.Model):
 
     def get_total_logs_details_by_domain(self, domain_id):
         return LogsDetails.query.filter_by(domain_id=domain_id).count()
-

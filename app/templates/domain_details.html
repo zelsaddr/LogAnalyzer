@@ -31,17 +31,31 @@
       </div>
     </div>
   </div>
-  <div class="card h-100">
-    <div class="card-body">
-      <h5 class="card-title">Domains : {{ domain_details.domain_name }}</h5>
-      <form method="POST" action="{{ url_for('logUpload') }}" enctype="multipart/form-data">
-        {{ form.hidden_tag() }}
-        <!-- <input type="hidden" name="domain_id" value="{{ domain_details.id }}" /> -->
-        <div class="form-group">{{ form.log.label(class='form-control-label') }} {{ form.log(class='form-control') }}</div>
-        <div class="form-group">
-          <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-upload"></i> Upload Log File</button>
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title">Domains : {{ domain_details.domain_name }}</h5>
+          <form method="POST" action="{{ url_for('logUpload') }}" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <!-- <input type="hidden" name="domain_id" value="{{ domain_details.id }}" /> -->
+            <div class="form-group">{{ form.log.label(class='form-control-label') }} {{ form.log(class='form-control') }}</div>
+            <div class="form-group">
+              <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-upload"></i> Upload Log File</button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fa fa-bar-chart"></i> Statistic</h5>
+          <div style="height: 200px" class="d-flex justify-content-center">
+            <canvas id="myChart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -71,6 +85,7 @@
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
+{% set url_labels = [] %} {% set count_data = [] %} {% for page in url_count %} {% set _ = url_labels.append(page[0]) %} {% set _ = count_data.append(page[1]) %} {% endfor %}
 <script>
   $(document).ready(function () {
     let domain_id = "{{ domain_details.id }}";
@@ -121,23 +136,61 @@
           },
         });
       } else if (action == "delete_log") {
-        $(".overlay").show();
-        $.ajax({
-          url: "/api/delete_log/" + id,
-          type: "DELETE",
-          success: function (data) {
-            if (data.status == "success") {
-              $(".overlay").hide();
-              alert("Log Deleted Successfully");
-              $("#domains-table").DataTable().ajax.reload();
-            } else {
-              alert("Something went wrong");
-            }
-          },
-        });
+        if (confirm("Are you sure you want to delete this log?")) {
+          $(".overlay").show();
+          $.ajax({
+            url: "/api/delete_log/" + id,
+            type: "DELETE",
+            success: function (data) {
+              if (data.status == "success") {
+                $(".overlay").hide();
+                alert("Log Deleted Successfully");
+                $("#domains-table").DataTable().ajax.reload();
+              } else {
+                alert("Something went wrong");
+              }
+            },
+          });
+        }
       } else if (action == "see_log_details") {
         window.location.href = "/log_details/" + id;
       }
+    });
+    const ctx = document.getElementById("myChart");
+    const label = `{{url_labels|tojson|safe}}`;
+    const data = `{{count_data|tojson|safe}}`;
+    let delayed;
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: JSON.parse(label),
+        datasets: [
+          {
+            label: "# Most visited pages",
+            data: JSON.parse(data),
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        animation: {
+          onComplete: () => {
+            delayed = true;
+          },
+          delay: (context) => {
+            let delay = 0;
+            if (context.type === "data" && context.mode === "default" && !delayed) {
+              delay = context.dataIndex * 300 + context.datasetIndex * 100;
+            }
+            return delay;
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+          },
+        },
+      },
     });
   });
 </script>

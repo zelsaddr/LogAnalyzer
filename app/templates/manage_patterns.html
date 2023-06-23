@@ -1,0 +1,99 @@
+{% extends 'base.html' %} {% block title %}Manage Patterns{% endblock %} {% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Manage Patterns</li>
+{% endblock %} {% block content %}
+
+<div>
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title"><i class="fa fa-save"></i> Add New Pattern</h5>
+      <form method="POST" action="{{ url_for('add_pattern') }}" class="mb-4">
+        {{ form.csrf_token }}
+        <div class="form-group">{{ form.pattern_name.label }} {{ form.pattern_name(class="form-control") }}</div>
+        <div class="form-group">{{ form.pattern_syntax.label }} {{ form.pattern_syntax(class="form-control") }}</div>
+        {{ form.submit(class="btn btn-primary") }}
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <h5 class="card-title"><i class="fa fa-save"></i> Pattern List</h5>
+      <table id="patterns-table" class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Pattern Name</th>
+            <th>Pattern Syntax</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pattern in patterns %}
+          <tr>
+            <td>{{ pattern.id }}</td>
+            <td>{{ pattern.pattern_name }}</td>
+            <td>{{ pattern.pattern_syntax }}</td>
+            <td>
+              <button class="btn btn-sm btn-primary edit-btn" data-toggle="modal" data-target="#editModal" data-id="{{ pattern.id }}" data-name="{{ pattern.pattern_name }}" data-syntax="{{ pattern.pattern_syntax }}">Edit</button>
+              <form method="POST" action="{{ url_for('delete_pattern', pattern_id=pattern.id) }}" class="d-inline">
+                {{ form.csrf_token() }}
+                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editModalLabel">Edit Pattern</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form id="editForm" method="POST" action="">
+            {{ form.csrf_token }}
+            <div class="form-group">{{ form.pattern_name.label }} {{ form.pattern_name(class="form-control", id="editPatternName") }}</div>
+            <div class="form-group">{{ form.pattern_syntax.label }} {{ form.pattern_syntax(class="form-control", id="editPatternSyntax") }}</div>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script src="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap4.min.css"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
+<script>
+  $(document).ready(function () {
+    $("#patterns-table").DataTable({
+      responsive: true,
+      order: [[0, "asc"]],
+      lengthMenu: [5, 10, 25, 50, 100],
+    });
+    $(".edit-btn").click(function () {
+      var id = $(this).data("id");
+      var name = $(this).data("name");
+      var syntax = $(this).data("syntax");
+
+      // Set form action
+      var formAction = "{{ url_for('edit_pattern', pattern_id=0) }}" + id;
+      $("#editForm").attr("action", formAction);
+
+      // Set input values
+      $("#editPatternName").val(name);
+      $("#editPatternSyntax").val(syntax);
+    });
+  });
+</script>
+{% endblock %}

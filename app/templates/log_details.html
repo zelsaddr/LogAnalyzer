@@ -6,7 +6,7 @@
 {% block content %}
 <div>
   <div class="row">
-    <div class="col-md-4 mb-4">
+    <div class="col-md-6 mb-4">
       <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">Total Lines Executed</h5>
@@ -14,15 +14,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-4 mb-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <h5 class="card-title">Total Log Files on DB</h5>
-          <p class="card-text">{{ all_status['total_log_files'] }}</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-4 mb-4">
+    <div class="col-md-6 mb-4">
       <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">Total Malicious Activity</h5>
@@ -35,9 +27,16 @@
     <div class="card-body">
       <div class="row">
         <div class="col-md-8">
-          <h5 class="card-title">Domain : {{ domain_details.domain_name }}</h5>
+          <div class="row">
+            <div class="col-md-12">
+              <h5 class="card-title">Domain : {{ domain_details.domain_name }}</h5>
+            </div>
+            <div class="col-md-8">
+              <canvas id="myChart"></canvas>
+            </div>
+          </div>
         </div>
-        <div class="col-md-4">
+      <div class="col-md-4">
           <p class="card-title">Log File : <span class="badge badge-success">{{ log_info.file_location }}</span><br>Log Uploaded : <span class="badge badge-info">{{ log_info.created_at }}</p>
         </div>
       </div>
@@ -52,7 +51,7 @@
     <form method="GET" action="{{ request.path }}">
       <div class="row mb-3">
         <div class="col-md-10">
-          <input type="text" name="search" class="form-control" placeholder="Search by path" value="{{ search_keyword }}" />
+          <input type="text" name="search" class="form-control" placeholder="Search by path" value="{{ search_keyword }}" required="" />
         </div>
         <div class="col-md-2">
           <button type="submit" class="btn btn-primary form-control"><i class="fa fa-search"></i> Search</button>
@@ -71,6 +70,7 @@
             <th>Status Code</th>
             <th>Log Type</th>
             <th>User Agent</th>
+            <th>Uagent Bot</th>
           </tr>
         </thead>
         <tbody>
@@ -83,6 +83,7 @@
             <td>{{ log.status_code }}</td>
             <td>{{ log.log_type }}</td>
             <td>{{ log.user_agent }}</td>
+            <td>{{ log.uagent_bot }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -133,68 +134,46 @@
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
-<!-- <script>
-  $(document).ready(function () {
-    let domain_id = "{{ domain_details.id }}";
-    $("#domains-table").DataTable({
-      responsive: true,
-      ajax: "/api/domain_storage/" + domain_id,
-      columns: [
-        { data: "id" },
-        { data: "file_location" },
-        { data: "created_at" },
-        {
-          data: null,
-          render: function (data, type, row) {
-            if (data.log_analyzed) return '<button data-id="' + row.id + '" data-action="see_log" class="btn btn-success form-control btn-sm analyze-btn"><i class="fa fa-check"></i>Analyzed</button>';
-            return '<button data-id="' + row.id + '" data-action="analyze" class="btn btn-warning btn-sm form-control analyze-btn"><i class="fa fa-search"></i> Analyze</button>';
-          },
+{% set url_labels = [] %}
+{% set count_data = [] %}
+  {% for page in url_count %}
+      {% set _ = url_labels.append(page[0]) %}
+      {% set _ = count_data.append(page[1]) %}
+  {% endfor %}
+<script>
+  const ctx = document.getElementById('myChart');
+  const label = '{{url_labels|tojson|safe}}';
+  const data = '{{count_data|tojson|safe}}';
+  let delayed;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: JSON.parse(label),
+      datasets: [{
+        label: '# Most visited pages',
+        data: JSON.parse(data),
+        borderWidth: 1
+      }]
+    },
+    options: {
+      animation: {
+        onComplete: () => {
+          delayed = true;
         },
-        {
-          data: null,
-          render: function (data, type, row) {
-            return '<button data-id="' + row.id + '" data-action="delete_log" class="btn btn-danger btn-sm form-control delete-btn"><i class="fa fa-trash"></i> Delete</button>';
-          },
+        delay: (context) => {
+          let delay = 0;
+          if (context.type === 'data' && context.mode === 'default' && !delayed) {
+            delay = context.dataIndex * 300 + context.datasetIndex * 100;
+          }
+          return delay;
         },
-      ],
-    });
-    $("#domains-table").on("click", "button", function () {
-      let action = $(this).data("action");
-      let id = $(this).data("id");
-      if (action == "analyze") {
-        $(".overlay").show();
-        $.ajax({
-          url: "/api/parse_log_file/" + id,
-          type: "GET",
-          success: function (data) {
-            if (data.status == "success") {
-              $(".overlay").hide();
-              alert("Log Analyzed Successfully with Execution time : " + data.execution_time + " seconds");
-              $("#domains-table").DataTable().ajax.reload();
-            } else {
-              alert("Something went wrong");
-            }
-          },
-        });
-      } else if (action == "delete_log") {
-        $(".overlay").show();
-        $.ajax({
-          url: "/api/delete_log/" + id,
-          type: "DELETE",
-          success: function (data) {
-            if (data.status == "success") {
-              $(".overlay").hide();
-              alert("Log Deleted Successfully");
-              $("#domains-table").DataTable().ajax.reload();
-            } else {
-              alert("Something went wrong");
-            }
-          },
-        });
-      } else if (action == "see_log") {
-        window.location.href = "/log_details/" + id;
+      },
+      scales: {
+        y: {
+          beginAtZero: true
+        }
       }
-    });
+    }
   });
-</script> -->
+</script>
 {% endblock %}

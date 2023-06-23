@@ -2,11 +2,12 @@ from flask import render_template, flash, redirect, url_for, request, jsonify
 from sqlalchemy import func, or_, not_
 from flask_login import current_user, login_user, logout_user, login_required
 from werkzeug.urls import url_parse
+from app.utils.boyer_moore import BoyerMoore as BM
 from urllib.parse import unquote
 import concurrent.futures
 import asyncio
 from app import app, db
-from app.forms import LoginForm, DomainForm, LogFormUpload
+from app.forms import LoginForm, DomainForm, LogFormUpload, PatternForm
 from app.models import User, Domain, LogStorage, Patterns, LogsDetails
 import os
 import re
@@ -27,12 +28,62 @@ def index():
              }
     form = DomainForm()
     if form.validate_on_submit():
+        domain_exists = Domain.query.filter_by(
+            domain_name=form.domain.data).first()
+        if domain_exists:
+            flash('Domain already exists!')
+            return redirect(url_for('index'))
         domain = Domain(domain_name=form.domain.data)
         db.session.add(domain)
         db.session.commit()
         flash('Domain added!')
         return redirect(url_for('index'))
     return render_template('index.html', title='Home', form=form, stats=stats)
+
+
+@app.route('/patterns')
+def index_pattern():
+    patterns = Patterns.query.all()
+    return render_template('manage_patterns.html', patterns=patterns, form=PatternForm())
+
+
+@app.route('/patterns/add', methods=['GET', 'POST'])
+def add_pattern():
+    form = PatternForm()
+
+    if form.validate_on_submit():
+        pattern = Patterns(pattern_name=form.pattern_name.data,
+                           pattern_syntax=form.pattern_syntax.data)
+        db.session.add(pattern)
+        db.session.commit()
+        flash('Pattern added successfully!', 'success')
+        return redirect(url_for('index_pattern'))
+
+    return render_template('manage_patterns.html', form=form)
+
+
+@app.route('/patterns/edit/<int:pattern_id>', methods=['GET', 'POST'])
+def edit_pattern(pattern_id):
+    pattern = Patterns.query.get_or_404(pattern_id)
+    form = PatternForm(obj=pattern)
+
+    if form.validate_on_submit():
+        pattern.pattern_name = form.pattern_name.data
+        pattern.pattern_syntax = form.pattern_syntax.data
+        db.session.commit()
+        flash('Pattern updated successfully!', 'success')
+        return redirect(url_for('index_pattern'))
+
+    return render_template('edit_pattern.html', form=form)
+
+
+@app.route('/patterns/delete/<int:pattern_id>', methods=['POST'])
+def delete_pattern(pattern_id):
+    pattern = Patterns.query.get_or_404(pattern_id)
+    db.session.delete(pattern)
+    db.session.commit()
+    flash('Pattern deleted successfully!', 'success')
+    return redirect(url_for('index_pattern'))
 
 
 @app.route('/domains/<int:domain_id>')
@@ -55,7 +106,26 @@ def domains(domain_id):
         'total_log_files': get_total_logfiles,
 
     }
-    return render_template('domain_details.html', title='Domain', domain_details=domain, form=form, all_status=all_status)
+    # Query to count URLs excluding certain extensions
+    excluded_keywords = ['.css', '.js', '.png', '.jpg',
+                         '.jpeg', '.gif', 'AJAX', '.woff', '.svg']
+
+    # Query to get the URL with the highest count, excluding certain file extensions
+    url_count = db.session.query(LogsDetails.url, func.count(LogsDetails.url).label('count')).\
+        filter(Domain.id == domain_id).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[0] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[1] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[2] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[3] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[4] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[5] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[6] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[7] + '%'))).\
+        filter(not_(LogsDetails.url.like('%' + excluded_keywords[8] + '%'))).\
+        group_by(LogsDetails.url).order_by(
+            func.count(LogsDetails.url).desc()).limit(6).all()
+
+    return render_template('domain_details.html', title='Domain', domain_details=domain, form=form, all_status=all_status, url_count=url_count)
 
 
 @app.route('/log_details/<int:log_id>')
@@ -65,15 +135,17 @@ def log_details(log_id):
     Log details page
     """
     all_status = {
-        'total_lines_executed': 0,
-        'malicious_activity': 0,
-        'total_log_files': 0,
+        'total_lines_executed': LogsDetails.query.filter_by(logs_storage_id=log_id).count(),
+        'malicious_activity': LogsDetails.query.filter(LogsDetails.logs_storage_id == log_id, LogsDetails.log_type != 'not_found').count(),
+        'log_types': db.session.query(LogsDetails.log_type, func.count()).filter(LogsDetails.logs_storage_id == log_id, LogsDetails.log_type != "not_found").group_by(LogsDetails.log_type).all()
     }
+    print(all_status['log_types'])
     log = LogStorage.query.get_or_404(log_id)
     get_domain = Domain.query.get_or_404(log.domain_id)
 
     # Query to count URLs excluding certain extensions
-    excluded_keywords = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', 'AJAX', '.woff', 'robots.txt']
+    excluded_keywords = ['.css', '.js', '.png', '.jpg',
+                         '.jpeg', '.gif', 'AJAX', '.woff', '.svg']
 
     # Query to get the URL with the highest count, excluding certain file extensions
     url_count = db.session.query(LogsDetails.url, func.count(LogsDetails.url).label('count')).\
@@ -87,15 +159,14 @@ def log_details(log_id):
         filter(not_(LogsDetails.url.like('%' + excluded_keywords[6] + '%'))).\
         filter(not_(LogsDetails.url.like('%' + excluded_keywords[7] + '%'))).\
         filter(not_(LogsDetails.url.like('%' + excluded_keywords[8] + '%'))).\
-        group_by(LogsDetails.url).order_by(func.count(LogsDetails.url).desc()).limit(6).all()
-    
-    print(url_count)
+        group_by(LogsDetails.url).order_by(
+            func.count(LogsDetails.url).desc()).limit(6).all()
     # Get the search term from the query string
     search_term = request.args.get('search', '')
 
     # Pagination
     page = request.args.get('page', 1, type=int)
-    per_page = 10
+    per_page = 6
 
     # Apply search term filter if provided
     query = LogsDetails.query
@@ -111,7 +182,7 @@ def log_details(log_id):
     # Apply pagination
     log_details = query.paginate(page=page, per_page=per_page)
 
-    return render_template('log_details.html', domain_details=get_domain, log_info=log, log_details=log_details, all_status=all_status, total_count=total_count, search_keyword=search_term)
+    return render_template('log_details.html', domain_details=get_domain, log_info=log, log_details=log_details, all_status=all_status, url_count=url_count, search_keyword=search_term)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -194,11 +265,19 @@ def parse_log_file(log_id):
                         'status_code': str(match.group(8)),
                         'http_version': str(match.group(7)),
                         'user_agent': str(match.group(11)),
-                        'date_str': str(datetime.strptime(match.group(4), '%d/%b/%Y:%H:%M:%S %z').date())
+                        'date_str': str(datetime.strptime(match.group(4), '%d/%b/%Y:%H:%M:%S %z').date()),
                     }
                     with app.app_context():
                         patternss = Patterns.query.all()
                         log_type = 'not_found'
+                        uagent_bot_list = ['googlebot', 'bot.html',
+                                           'sqlmap', 'baidu', 'bingbot.htm']
+                        for bot in uagent_bot_list:
+                            if BM().boyer_moore_search(obj_parsed['user_agent'], bot):
+                                obj_parsed['uagent_bot'] = 'bot'
+                                break
+                            else:
+                                obj_parsed['uagent_bot'] = 'not_bot'
                         for dd in patternss:
                             if re.search(r"%s" % dd.pattern_syntax, obj_parsed['path'], re.IGNORECASE):
                                 log_type = dd.pattern_name
@@ -213,7 +292,8 @@ def parse_log_file(log_id):
                             url=obj_parsed['path'],
                             status_code=obj_parsed['status_code'],
                             user_agent=obj_parsed['user_agent'],
-                            log_type=log_type
+                            log_type=log_type,
+                            uagent_bot=obj_parsed['uagent_bot']
                         )
                         db.session.add(toDb)
                         db.session.commit()
@@ -225,6 +305,7 @@ def parse_log_file(log_id):
             results = executor.map(parse_log_line, datas.split('\n'))
             for result in results:
                 if result:
+                    print(result)
                     all_logs_parsed.append(result)
         end_time = time.time()
         execution_time = end_time - start_time
@@ -237,20 +318,20 @@ def parse_log_file(log_id):
     return jsonify(data)
 
 
-@app.route('/api/domains_list')
-@login_required
+@ app.route('/api/domains_list')
+@ login_required
 def domains_list():
     """
     Returns a list of domains in JSON format
     """
     domains = Domain.query.all()
     data = {'data': [{'id': domain.id, 'domain_name': domain.domain_name}
-            for domain in domains]}
+                     for domain in domains]}
     return jsonify(data)
 
 
-@app.route('/api/delete_domain/<int:domain_id>', methods=['DELETE'])
-@login_required
+@ app.route('/api/delete_domain/<int:domain_id>', methods=['DELETE'])
+@ login_required
 def delete_domain(domain_id):
     """
     Deletes a domain
@@ -267,8 +348,8 @@ def delete_domain(domain_id):
         return jsonify({'status': 'error', 'message': str(e)})
 
 
-@app.route('/api/domain_storage/<int:domain_id>')
-@login_required
+@ app.route('/api/domain_storage/<int:domain_id>')
+@ login_required
 def domain_storage(domain_id):
     """
     Returns a list of log files for a domain in JSON format
@@ -287,8 +368,8 @@ def domain_storage(domain_id):
     return jsonify(data)
 
 
-@app.route('/api/delete_log/<int:log_id>', methods=['DELETE'])
-@login_required
+@ app.route('/api/delete_log/<int:log_id>', methods=['DELETE'])
+@ login_required
 def delete_log(log_id):
     """
     Deletes a log file
